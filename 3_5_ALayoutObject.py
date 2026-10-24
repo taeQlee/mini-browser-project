@@ -116,6 +116,7 @@ class Layout:
         self.cursor_y = VSTEP
         self.weight = "normal"
         self.style = "roman"
+        self.size = 12
 
         for tok in tokens:
             self.token(tok)
@@ -127,19 +128,24 @@ class Layout:
 
         elif tok.tag == "i":
             self.style = "italic"
-
         elif tok.tag == "/i":
             self.style = "roman"
-
         elif tok.tag == "b":
             self.weight = "bold"
-
         elif tok.tag == "/b":
             self.weight = "normal"
+        elif tok.tag == "small":
+            self.size -= 2
+        elif tok.tag == "/small":
+            self.size += 2
+        elif tok.tag == "big":
+            self.size += 4
+        elif tok.tag == "/big":
+            self.size -= 4
 
     def word(self, word):
         font = tkinter.font.Font(
-            size=16,
+            size=self.size,
             weight=self.weight,
             slant=self.style,
         )
@@ -170,12 +176,14 @@ class Browser:
 
     def draw(self):
         self.canvas.delete("all")
-        for x, y, c, font in self.display_list:
+        for x, y, word, font in self.display_list:
             if y > self.scroll + HEIGHT:
                 continue
             if y + VSTEP < self.scroll:
                 continue
-            self.canvas.create_text(x, y - self.scroll, text=c, font=font, anchor="nw")
+            self.canvas.create_text(
+                x, y - self.scroll, text=word, font=font, anchor="nw"
+            )
 
     def scrolldown(self, e):
         self.scroll += SCROLL_STEP
