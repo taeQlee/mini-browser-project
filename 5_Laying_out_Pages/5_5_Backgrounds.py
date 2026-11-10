@@ -4,6 +4,117 @@ import tkinter
 import tkinter.font
 
 
+SELF_CLOSING_TAGS = [
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+]
+
+
+WIDTH, HEIGHT = 800, 600
+HSTEP, VSTEP = 13, 18
+
+FONTS = {}
+
+BLOCK_ELEMENTS = [
+    "html",
+    "body",
+    "article",
+    "section",
+    "nav",
+    "aside",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hgroup",
+    "header",
+    "footer",
+    "address",
+    "p",
+    "hr",
+    "pre",
+    "blockquote",
+    "ol",
+    "ul",
+    "menu",
+    "li",
+    "dl",
+    "dt",
+    "dd",
+    "figure",
+    "figcaption",
+    "main",
+    "div",
+    "table",
+    "form",
+    "fieldset",
+    "legend",
+    "details",
+    "summary",
+]
+
+
+SCROLL_STEP = 100
+
+
+class Browser:
+    def __init__(self):
+        self.window = tkinter.Tk()
+        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
+        self.canvas.pack()
+        self.scroll = 0
+        self.window.bind("<Down>", self.scrolldown)
+
+    def load(self, url):
+        body = url.request()
+
+        # 예제 response html 에 "pre" 테그가 포함이 안되어 있는 것 같음. 아래 바디를 이용하면 정상 작동 -> 크롬으로 get 요청해서 개발자도구로 확인해보니 <pre>테그 없음
+        # body = """
+        #     <html>
+        #     <body>
+        #     <p>Normal text</p>
+        #     <pre>Hello World</pre>
+        #     <p>Normal text again</p>
+        #     </body>
+        #     </html>
+        #     """
+
+        self.nodes = HTMLParser(body).parse()
+        self.document = DocumentLayout(self.nodes)
+        self.document.layout()
+        self.display_list = []
+        paint_tree(self.document, self.display_list)
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        for cmd in self.display_list:
+            if cmd.top > self.scroll + HEIGHT:
+                continue
+            if cmd.bottom < self.scroll:
+                continue
+            cmd.execute(self.scroll, self.canvas)
+
+    def scrolldown(self, e):
+        max_y = max(self.document.height + 2 * VSTEP - HEIGHT, 0)
+        self.scroll = min(self.scroll + SCROLL_STEP, max_y)
+        self.draw()
+
+
 class URL:
     def __init__(self, url):
 
@@ -73,45 +184,6 @@ class URL:
         return content
 
 
-class Text:
-    def __init__(self, text, parent):
-        self.text = text
-        self.children = []
-        self.parent = parent
-
-    def __repr__(self):
-        return repr(self.text)
-
-
-class Element:
-    def __init__(self, tag, attributes, parent):
-        self.tag = tag
-        self.children = []
-        self.parent = parent
-        self.attributes = attributes
-
-    def __repr__(self):
-        return "<" + self.tag + ">"
-
-
-SELF_CLOSING_TAGS = [
-    "area",
-    "base",
-    "br",
-    "col",
-    "embed",
-    "hr",
-    "img",
-    "input",
-    "link",
-    "meta",
-    "param",
-    "source",
-    "track",
-    "wbr",
-]
-
-
 class HTMLParser:
     HEAD_TAGS = [
         "base",
@@ -129,6 +201,25 @@ class HTMLParser:
         self.body = body
         self.unfinished = []
 
+    def parse(self):
+        text = ""
+        in_tag = False
+        for c in self.body:
+            if c == "<":
+                in_tag = True
+                if text:
+                    self.add_text(text)
+                text = ""
+            elif c == ">":
+                in_tag = False
+                self.add_tag(text)
+                text = ""
+            else:
+                text += c
+        if not in_tag and text:
+            self.add_text(text)
+        return self.finish()
+
     def add_text(self, text):
         if text.isspace():
             return
@@ -136,6 +227,23 @@ class HTMLParser:
         parent = self.unfinished[-1]
         node = Text(text, parent)
         parent.children.append(node)
+
+    def implicit_tags(self, tag):
+        while True:
+            open_tags = [node.tag for node in self.unfinished]
+            if open_tags == [] and tag != "html":
+                self.add_tag("html")
+            elif open_tags == ["html"] and tag not in ["head", "body", "/html"]:
+                if tag in self.HEAD_TAGS:
+                    self.add_tag("head")
+                else:
+                    self.add_tag("body")
+            elif (
+                open_tags == ["html", "head"] and tag not in ["/head"] + self.HEAD_TAGS
+            ):
+                self.add_tag("/head")
+            else:
+                break
 
     def add_tag(self, tag):
         tag, attributes = self.get_attributes(tag)
@@ -159,34 +267,6 @@ class HTMLParser:
             node = Element(tag, attributes, parent)
             self.unfinished.append(node)
 
-    def finish(self):
-        if not self.unfinished:
-            self.implicit_tags(None)
-        while len(self.unfinished) > 1:
-            node = self.unfinished.pop()
-            parent = self.unfinished[-1]
-            parent.children.append(node)
-        return self.unfinished.pop()
-
-    def parse(self):
-        text = ""
-        in_tag = False
-        for c in self.body:
-            if c == "<":
-                in_tag = True
-                if text:
-                    self.add_text(text)
-                text = ""
-            elif c == ">":
-                in_tag = False
-                self.add_tag(text)
-                text = ""
-            else:
-                text += c
-        if not in_tag and text:
-            self.add_text(text)
-        return self.finish()
-
     def get_attributes(self, text):
         parts = text.split()
         tag = parts[0].casefold()
@@ -201,87 +281,35 @@ class HTMLParser:
                 attributes[attrpair.casefold()] = ""
         return tag, attributes
 
-    def implicit_tags(self, tag):
-        while True:
-            open_tags = [node.tag for node in self.unfinished]
-            if open_tags == [] and tag != "html":
-                self.add_tag("html")
-            elif open_tags == ["html"] and tag not in ["head", "body", "/html"]:
-                if tag in self.HEAD_TAGS:
-                    self.add_tag("head")
-                else:
-                    self.add_tag("body")
-            elif (
-                open_tags == ["html", "head"] and tag not in ["/head"] + self.HEAD_TAGS
-            ):
-                self.add_tag("/head")
-            else:
-                break
+    def finish(self):
+        if not self.unfinished:
+            self.implicit_tags(None)
+        while len(self.unfinished) > 1:
+            node = self.unfinished.pop()
+            parent = self.unfinished[-1]
+            parent.children.append(node)
+        return self.unfinished.pop()
 
 
-def print_tree(node, indent=0):
-    print(" " * indent, node)
-    for child in node.children:
-        print_tree(child, indent + 2)
+class Element:
+    def __init__(self, tag, attributes, parent):
+        self.tag = tag
+        self.children = []
+        self.parent = parent
+        self.attributes = attributes
+
+    def __repr__(self):
+        return "<" + self.tag + ">"
 
 
-WIDTH, HEIGHT = 800, 600
-HSTEP, VSTEP = 13, 18
+class Text:
+    def __init__(self, text, parent):
+        self.text = text
+        self.children = []
+        self.parent = parent
 
-FONTS = {}
-
-BLOCK_ELEMENTS = [
-    "html",
-    "body",
-    "article",
-    "section",
-    "nav",
-    "aside",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "hgroup",
-    "header",
-    "footer",
-    "address",
-    "p",
-    "hr",
-    "pre",
-    "blockquote",
-    "ol",
-    "ul",
-    "menu",
-    "li",
-    "dl",
-    "dt",
-    "dd",
-    "figure",
-    "figcaption",
-    "main",
-    "div",
-    "table",
-    "form",
-    "fieldset",
-    "legend",
-    "details",
-    "summary",
-]
-
-
-def get_font(size, weight, style):
-    key = (size, weight, style)
-    if key not in FONTS:
-        font = tkinter.font.Font(
-            size=size,
-            weight=weight,
-            slant=style,
-        )
-        label = tkinter.Label(font=font)
-        FONTS[key] = (font, label)
-    return FONTS[key][0]
+    def __repr__(self):
+        return repr(self.text)
 
 
 class DocumentLayout:
@@ -300,12 +328,12 @@ class DocumentLayout:
         self.height = child.height
         # self.display_list = child.display_list
 
+    def paint(self):
+        return []
+
     # print_tree 시 깔끔하게 보기 위해
     def __repr__(self):
         return "DocumentLayout"
-
-    def paint(self):
-        return []
 
 
 class BlockLayout:
@@ -318,22 +346,6 @@ class BlockLayout:
         self.y = None
         self.width = None
         self.height = None
-
-    # print_tree 시 깔끔하게 보기 위해
-    def __repr__(self):
-        return f"BlockLayout({self.node})"
-
-    def paint(self):
-        cmds = []
-        if isinstance(self.node, Element) and self.node.tag == "pre":
-            x2, y2 = self.x + self.width, self.y + self.height
-            rect = DrawRect(self.x, self.y, x2, y2, "gray")
-            cmds.append(rect)
-
-        if self.layout_mode() == "inline":
-            for x, y, word, font in self.display_list:
-                cmds.append(DrawText(x, y, word, font))
-        return cmds
 
     def layout(self):
         self.display_list = []
@@ -386,6 +398,16 @@ class BlockLayout:
         else:
             return "block"
 
+    def recurse(self, tree):
+        if isinstance(tree, Text):
+            for word in tree.text.split():
+                self.word(word)
+        else:
+            self.open_tag(tree.tag)
+            for child in tree.children:
+                self.recurse(child)
+            self.close_tag(tree.tag)
+
     def open_tag(self, tag):
         if tag == "i":
             self.style = "italic"
@@ -397,29 +419,6 @@ class BlockLayout:
             self.size += 4
         elif tag == "br":
             self.flush()
-
-    def close_tag(self, tag):
-        if tag == "i":
-            self.style = "roman"
-        elif tag == "b":
-            self.weight = "normal"
-        elif tag == "small":
-            self.size += 2
-        elif tag == "big":
-            self.size -= 4
-        elif tag == "p":
-            self.flush()
-            self.cursor_y += VSTEP
-
-    def recurse(self, tree):
-        if isinstance(tree, Text):
-            for word in tree.text.split():
-                self.word(word)
-        else:
-            self.open_tag(tree.tag)
-            for child in tree.children:
-                self.recurse(child)
-            self.close_tag(tree.tag)
 
     def word(self, word):
         font = get_font(self.size, self.weight, self.style)
@@ -447,8 +446,47 @@ class BlockLayout:
         self.cursor_x = 0
         self.line = []
 
+    def close_tag(self, tag):
+        if tag == "i":
+            self.style = "roman"
+        elif tag == "b":
+            self.weight = "normal"
+        elif tag == "small":
+            self.size += 2
+        elif tag == "big":
+            self.size -= 4
+        elif tag == "p":
+            self.flush()
+            self.cursor_y += VSTEP
 
-SCROLL_STEP = 100
+    def paint(self):
+        cmds = []
+        if isinstance(self.node, Element) and self.node.tag == "pre":
+            x2, y2 = self.x + self.width, self.y + self.height
+            rect = DrawRect(self.x, self.y, x2, y2, "gray")
+            cmds.append(rect)
+
+        if self.layout_mode() == "inline":
+            for x, y, word, font in self.display_list:
+                cmds.append(DrawText(x, y, word, font))
+        return cmds
+
+    # print_tree 시 깔끔하게 보기 위해
+    def __repr__(self):
+        return f"BlockLayout({self.node})"
+
+
+def get_font(size, weight, style):
+    key = (size, weight, style)
+    if key not in FONTS:
+        font = tkinter.font.Font(
+            size=size,
+            weight=weight,
+            slant=style,
+        )
+        label = tkinter.Label(font=font)
+        FONTS[key] = (font, label)
+    return FONTS[key][0]
 
 
 def paint_tree(layout_object, display_list):
@@ -456,20 +494,6 @@ def paint_tree(layout_object, display_list):
 
     for child in layout_object.children:
         paint_tree(child, display_list)
-
-
-class DrawText:
-    def __init__(self, x1, y1, text, font):
-        self.top = y1
-        self.left = x1
-        self.text = text
-        self.font = font
-        self.bottom = y1 + font.metrics("linespace")
-
-    def execute(self, scroll, canvas):
-        canvas.create_text(
-            self.left, self.top - scroll, text=self.text, font=self.font, anchor="nw"
-        )
 
 
 class DrawRect:
@@ -491,48 +515,24 @@ class DrawRect:
         )
 
 
-class Browser:
-    def __init__(self):
-        self.window = tkinter.Tk()
-        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
-        self.canvas.pack()
-        self.scroll = 0
-        self.window.bind("<Down>", self.scrolldown)
+class DrawText:
+    def __init__(self, x1, y1, text, font):
+        self.top = y1
+        self.left = x1
+        self.text = text
+        self.font = font
+        self.bottom = y1 + font.metrics("linespace")
 
-    def load(self, url):
-        body = url.request()
+    def execute(self, scroll, canvas):
+        canvas.create_text(
+            self.left, self.top - scroll, text=self.text, font=self.font, anchor="nw"
+        )
 
-        # 예제 response html 에 "pre" 테그가 포함이 안되어 있는 것 같음. 아래 바디를 이용하면 정상 작동 -> 크롬으로 get 요청해서 개발자도구로 확인해보니 <pre>테그 없음
-        # body = """
-        #     <html>
-        #     <body>
-        #     <p>Normal text</p>
-        #     <pre>Hello World</pre>
-        #     <p>Normal text again</p>
-        #     </body>
-        #     </html>
-        #     """
 
-        self.nodes = HTMLParser(body).parse()
-        self.document = DocumentLayout(self.nodes)
-        self.document.layout()
-        self.display_list = []
-        paint_tree(self.document, self.display_list)
-        self.draw()
-
-    def draw(self):
-        self.canvas.delete("all")
-        for cmd in self.display_list:
-            if cmd.top > self.scroll + HEIGHT:
-                continue
-            if cmd.bottom < self.scroll:
-                continue
-            cmd.execute(self.scroll, self.canvas)
-
-    def scrolldown(self, e):
-        max_y = max(self.document.height + 2 * VSTEP - HEIGHT, 0)
-        self.scroll = min(self.scroll + SCROLL_STEP, max_y)
-        self.draw()
+def print_tree(node, indent=0):
+    print(" " * indent, node)
+    for child in node.children:
+        print_tree(child, indent + 2)
 
 
 if __name__ == "__main__":
