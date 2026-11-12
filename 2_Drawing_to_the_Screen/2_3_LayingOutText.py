@@ -3,6 +3,28 @@ import ssl
 import tkinter
 
 
+WIDTH, HEIGHT = 800, 600
+HSTEP, VSTEP = 13, 18
+
+
+class Browser:
+    def __init__(self):
+        self.window = tkinter.Tk()
+        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
+        self.canvas.pack()
+
+    def load(self, url):
+        body = url.request()
+        text = lex(body)
+        cursor_x, cursor_y = HSTEP, VSTEP
+        for c in text:
+            self.canvas.create_text(cursor_x, cursor_y, text=c)
+            cursor_x += HSTEP
+            if cursor_x >= WIDTH - HSTEP:
+                cursor_x = HSTEP
+                cursor_y += VSTEP
+
+
 class URL:
     def __init__(self, url):
 
@@ -84,28 +106,6 @@ def lex(body):
         elif not in_tag:
             text += c
     return text
-
-
-WIDTH, HEIGHT = 800, 600
-HSTEP, VSTEP = 13, 18
-
-
-class Browser:
-    def __init__(self):
-        self.window = tkinter.Tk()
-        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
-        self.canvas.pack()
-
-    def load(self, url):
-        body = url.request()
-        text = lex(body)
-        cursor_x, cursor_y = HSTEP, VSTEP
-        for c in text:
-            self.canvas.create_text(cursor_x, cursor_y, text=c)
-            cursor_x += HSTEP
-            if cursor_x >= WIDTH - HSTEP:
-                cursor_x = HSTEP
-                cursor_y += VSTEP
 
 
 if __name__ == "__main__":

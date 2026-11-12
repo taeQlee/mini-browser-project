@@ -54,6 +54,11 @@ class URL:
         return content
 
 
+def load(url):
+    body = url.request()
+    show(body)
+
+
 def show(body):
     in_tag = False
 
@@ -64,11 +69,6 @@ def show(body):
             in_tag = False
         elif not in_tag:
             print(c, end="")
-
-
-def load(url):
-    body = url.request()
-    show(body)
 
 
 if __name__ == "__main__":

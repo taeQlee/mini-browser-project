@@ -4,6 +4,45 @@ import tkinter
 import tkinter.font
 
 
+WIDTH, HEIGHT = 800, 600
+HSTEP, VSTEP = 13, 18
+
+FONTS = {}
+
+
+SCROLL_STEP = 100
+
+
+class Browser:
+    def __init__(self):
+        self.window = tkinter.Tk()
+        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
+        self.canvas.pack()
+        self.scroll = 0
+        self.window.bind("<Down>", self.scrolldown)
+
+    def load(self, url):
+        body = url.request()
+        tokens = lex(body)
+        self.display_list = Layout(tokens).display_list
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        for x, y, word, font in self.display_list:
+            if y > self.scroll + HEIGHT:
+                continue
+            if y + VSTEP < self.scroll:
+                continue
+            self.canvas.create_text(
+                x, y - self.scroll, text=word, font=font, anchor="nw"
+            )
+
+    def scrolldown(self, e):
+        self.scroll += SCROLL_STEP
+        self.draw()
+
+
 class URL:
     def __init__(self, url):
 
@@ -73,20 +112,6 @@ class URL:
         return content
 
 
-class Text:
-    def __init__(self, text, parent):
-        self.text = text
-        self.children = []
-        self.parent = parent
-
-
-class Element:
-    def __init__(self, tag, parent):
-        self.tag = tag
-        self.children = []
-        self.parent = parent
-
-
 # 이 프로그램은 실행될 수 없다. 왜냐하면 클래스 내 함수들이 아직 구현이 안되었기 때문이다. 그래서 파일명에 소괄호로 "NE"라고 표시해두었다.
 class HTMLParser:
     def __init__(self, body):
@@ -113,23 +138,18 @@ class HTMLParser:
         return self.finish()
 
 
-WIDTH, HEIGHT = 800, 600
-HSTEP, VSTEP = 13, 18
+class Element:
+    def __init__(self, tag, parent):
+        self.tag = tag
+        self.children = []
+        self.parent = parent
 
-FONTS = {}
 
-
-def get_font(size, weight, style):
-    key = (size, weight, style)
-    if key not in FONTS:
-        font = tkinter.font.Font(
-            size=size,
-            weight=weight,
-            slant=style,
-        )
-        label = tkinter.Label(font=font)
-        FONTS[key] = (font, label)
-    return FONTS[key][0]
+class Text:
+    def __init__(self, text, parent):
+        self.text = text
+        self.children = []
+        self.parent = parent
 
 
 class Layout:
@@ -200,37 +220,17 @@ class Layout:
         self.line = []
 
 
-SCROLL_STEP = 100
-
-
-class Browser:
-    def __init__(self):
-        self.window = tkinter.Tk()
-        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
-        self.canvas.pack()
-        self.scroll = 0
-        self.window.bind("<Down>", self.scrolldown)
-
-    def load(self, url):
-        body = url.request()
-        tokens = lex(body)
-        self.display_list = Layout(tokens).display_list
-        self.draw()
-
-    def draw(self):
-        self.canvas.delete("all")
-        for x, y, word, font in self.display_list:
-            if y > self.scroll + HEIGHT:
-                continue
-            if y + VSTEP < self.scroll:
-                continue
-            self.canvas.create_text(
-                x, y - self.scroll, text=word, font=font, anchor="nw"
-            )
-
-    def scrolldown(self, e):
-        self.scroll += SCROLL_STEP
-        self.draw()
+def get_font(size, weight, style):
+    key = (size, weight, style)
+    if key not in FONTS:
+        font = tkinter.font.Font(
+            size=size,
+            weight=weight,
+            slant=style,
+        )
+        label = tkinter.Label(font=font)
+        FONTS[key] = (font, label)
+    return FONTS[key][0]
 
 
 if __name__ == "__main__":

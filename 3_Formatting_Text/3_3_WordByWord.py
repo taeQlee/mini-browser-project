@@ -4,6 +4,41 @@ import tkinter
 import tkinter.font
 
 
+WIDTH, HEIGHT = 800, 600
+HSTEP, VSTEP = 13, 18
+
+
+SCROLL_STEP = 100
+
+
+class Browser:
+    def __init__(self):
+        self.window = tkinter.Tk()
+        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
+        self.canvas.pack()
+        self.scroll = 0
+        self.window.bind("<Down>", self.scrolldown)
+
+    def load(self, url):
+        body = url.request()
+        text = lex(body)
+        self.display_list = layout(text)
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        for x, y, word in self.display_list:
+            if y > self.scroll + HEIGHT:
+                continue
+            if y + VSTEP < self.scroll:
+                continue
+            self.canvas.create_text(x, y - self.scroll, text=word, anchor="nw")
+
+    def scrolldown(self, e):
+        self.scroll += SCROLL_STEP
+        self.draw()
+
+
 class URL:
     def __init__(self, url):
 
@@ -86,10 +121,6 @@ def lex(body):
     return text
 
 
-WIDTH, HEIGHT = 800, 600
-HSTEP, VSTEP = 13, 18
-
-
 def layout(text):
     font = tkinter.font.Font()
     display_list = []
@@ -103,37 +134,6 @@ def layout(text):
         cursor_x += w + font.measure(" ")
 
     return display_list
-
-
-SCROLL_STEP = 100
-
-
-class Browser:
-    def __init__(self):
-        self.window = tkinter.Tk()
-        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
-        self.canvas.pack()
-        self.scroll = 0
-        self.window.bind("<Down>", self.scrolldown)
-
-    def load(self, url):
-        body = url.request()
-        text = lex(body)
-        self.display_list = layout(text)
-        self.draw()
-
-    def draw(self):
-        self.canvas.delete("all")
-        for x, y, word in self.display_list:
-            if y > self.scroll + HEIGHT:
-                continue
-            if y + VSTEP < self.scroll:
-                continue
-            self.canvas.create_text(x, y - self.scroll, text=word, anchor="nw")
-
-    def scrolldown(self, e):
-        self.scroll += SCROLL_STEP
-        self.draw()
 
 
 if __name__ == "__main__":

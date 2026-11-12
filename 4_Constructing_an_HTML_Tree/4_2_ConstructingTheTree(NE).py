@@ -4,6 +4,45 @@ import tkinter
 import tkinter.font
 
 
+WIDTH, HEIGHT = 800, 600
+HSTEP, VSTEP = 13, 18
+
+FONTS = {}
+
+
+SCROLL_STEP = 100
+
+
+class Browser:
+    def __init__(self):
+        self.window = tkinter.Tk()
+        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
+        self.canvas.pack()
+        self.scroll = 0
+        self.window.bind("<Down>", self.scrolldown)
+
+    def load(self, url):
+        body = url.request()
+        tokens = lex(body)
+        self.display_list = Layout(tokens).display_list
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        for x, y, word, font in self.display_list:
+            if y > self.scroll + HEIGHT:
+                continue
+            if y + VSTEP < self.scroll:
+                continue
+            self.canvas.create_text(
+                x, y - self.scroll, text=word, font=font, anchor="nw"
+            )
+
+    def scrolldown(self, e):
+        self.scroll += SCROLL_STEP
+        self.draw()
+
+
 class URL:
     def __init__(self, url):
 
@@ -73,20 +112,6 @@ class URL:
         return content
 
 
-class Text:
-    def __init__(self, text, parent):
-        self.text = text
-        self.children = []
-        self.parent = parent
-
-
-class Element:
-    def __init__(self, tag, parent):
-        self.tag = tag
-        self.children = []
-        self.parent = parent
-
-
 # # 현재 코드는 Parser와 Layout 간의 자료구조 불일치로 실행되지 않는다.
 # 기존 lex(body)는 Token 객체들의 리스트를 반환했지만,
 # HTMLParser(body).parse()는 DOM Tree의 Root Element 객체를 반환한다.
@@ -97,6 +122,25 @@ class HTMLParser:
     def __init__(self, body):
         self.body = body
         self.unfinished = []
+
+    def parse(self):
+        text = ""
+        in_tag = False
+        for c in self.body:
+            if c == "<":
+                in_tag = True
+                if text:
+                    self.add_text(text)
+                text = ""
+            elif c == ">":
+                in_tag = False
+                self.add_tag(text)
+                text = ""
+            else:
+                text += c
+        if not in_tag and text:
+            self.add_text(text)
+        return self.finish()
 
     def add_text(self, text):
         parent = self.unfinished[-1]
@@ -122,43 +166,19 @@ class HTMLParser:
             parent.children.append(node)
         return self.unfinished.pop()
 
-    def parse(self):
-        text = ""
-        in_tag = False
-        for c in self.body:
-            if c == "<":
-                in_tag = True
-                if text:
-                    self.add_text(text)
-                text = ""
-            elif c == ">":
-                in_tag = False
-                self.add_tag(text)
-                text = ""
-            else:
-                text += c
-        if not in_tag and text:
-            self.add_text(text)
-        return self.finish()
+
+class Element:
+    def __init__(self, tag, parent):
+        self.tag = tag
+        self.children = []
+        self.parent = parent
 
 
-WIDTH, HEIGHT = 800, 600
-HSTEP, VSTEP = 13, 18
-
-FONTS = {}
-
-
-def get_font(size, weight, style):
-    key = (size, weight, style)
-    if key not in FONTS:
-        font = tkinter.font.Font(
-            size=size,
-            weight=weight,
-            slant=style,
-        )
-        label = tkinter.Label(font=font)
-        FONTS[key] = (font, label)
-    return FONTS[key][0]
+class Text:
+    def __init__(self, text, parent):
+        self.text = text
+        self.children = []
+        self.parent = parent
 
 
 class Layout:
@@ -229,37 +249,17 @@ class Layout:
         self.line = []
 
 
-SCROLL_STEP = 100
-
-
-class Browser:
-    def __init__(self):
-        self.window = tkinter.Tk()
-        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
-        self.canvas.pack()
-        self.scroll = 0
-        self.window.bind("<Down>", self.scrolldown)
-
-    def load(self, url):
-        body = url.request()
-        tokens = lex(body)
-        self.display_list = Layout(tokens).display_list
-        self.draw()
-
-    def draw(self):
-        self.canvas.delete("all")
-        for x, y, word, font in self.display_list:
-            if y > self.scroll + HEIGHT:
-                continue
-            if y + VSTEP < self.scroll:
-                continue
-            self.canvas.create_text(
-                x, y - self.scroll, text=word, font=font, anchor="nw"
-            )
-
-    def scrolldown(self, e):
-        self.scroll += SCROLL_STEP
-        self.draw()
+def get_font(size, weight, style):
+    key = (size, weight, style)
+    if key not in FONTS:
+        font = tkinter.font.Font(
+            size=size,
+            weight=weight,
+            slant=style,
+        )
+        label = tkinter.Label(font=font)
+        FONTS[key] = (font, label)
+    return FONTS[key][0]
 
 
 if __name__ == "__main__":

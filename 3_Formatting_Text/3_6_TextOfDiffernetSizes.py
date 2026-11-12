@@ -4,6 +4,43 @@ import tkinter
 import tkinter.font
 
 
+WIDTH, HEIGHT = 800, 600
+HSTEP, VSTEP = 13, 18
+
+
+SCROLL_STEP = 100
+
+
+class Browser:
+    def __init__(self):
+        self.window = tkinter.Tk()
+        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
+        self.canvas.pack()
+        self.scroll = 0
+        self.window.bind("<Down>", self.scrolldown)
+
+    def load(self, url):
+        body = url.request()
+        tokens = lex(body)
+        self.display_list = Layout(tokens).display_list
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        for x, y, word, font in self.display_list:
+            if y > self.scroll + HEIGHT:
+                continue
+            if y + VSTEP < self.scroll:
+                continue
+            self.canvas.create_text(
+                x, y - self.scroll, text=word, font=font, anchor="nw"
+            )
+
+    def scrolldown(self, e):
+        self.scroll += SCROLL_STEP
+        self.draw()
+
+
 class URL:
     def __init__(self, url):
 
@@ -73,16 +110,6 @@ class URL:
         return content
 
 
-class Text:
-    def __init__(self, text):
-        self.text = text
-
-
-class Tag:
-    def __init__(self, tag):
-        self.tag = tag
-
-
 def lex(body):
     out = []
     buffer = ""
@@ -105,8 +132,14 @@ def lex(body):
     return out
 
 
-WIDTH, HEIGHT = 800, 600
-HSTEP, VSTEP = 13, 18
+class Text:
+    def __init__(self, text):
+        self.text = text
+
+
+class Tag:
+    def __init__(self, tag):
+        self.tag = tag
 
 
 class Layout:
@@ -179,39 +212,6 @@ class Layout:
         self.cursor_y = baseline + 1.25 * max_descent
         self.cursor_x = HSTEP
         self.line = []
-
-
-SCROLL_STEP = 100
-
-
-class Browser:
-    def __init__(self):
-        self.window = tkinter.Tk()
-        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
-        self.canvas.pack()
-        self.scroll = 0
-        self.window.bind("<Down>", self.scrolldown)
-
-    def load(self, url):
-        body = url.request()
-        tokens = lex(body)
-        self.display_list = Layout(tokens).display_list
-        self.draw()
-
-    def draw(self):
-        self.canvas.delete("all")
-        for x, y, word, font in self.display_list:
-            if y > self.scroll + HEIGHT:
-                continue
-            if y + VSTEP < self.scroll:
-                continue
-            self.canvas.create_text(
-                x, y - self.scroll, text=word, font=font, anchor="nw"
-            )
-
-    def scrolldown(self, e):
-        self.scroll += SCROLL_STEP
-        self.draw()
 
 
 if __name__ == "__main__":
