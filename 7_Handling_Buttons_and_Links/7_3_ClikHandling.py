@@ -258,7 +258,9 @@ class Browser:
         y += self.scroll
         objs = [
             obj
-            for obj in tree_to_list(self.document, [])
+            for obj in tree_to_list(
+                self.document, []
+            )  # convert nodes into list able to be iterable
             if obj.x <= x < obj.x + obj.width and obj.y <= y < obj.y + obj.height
         ]
         if not objs:
@@ -745,7 +747,7 @@ class DrawRect:
         self.top = y1
         self.left = x1
         self.bottom = y2
-        self.right = x2
+        self.right = x2cmd in self.display_list
         self.color = color
 
     def execute(self, scroll, canvas):
